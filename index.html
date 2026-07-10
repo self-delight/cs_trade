@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CS2 关中Major · 队员交易平台</title>
+  <title>CS2 校内赛 · 队员交易平台</title>
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
   <style>
     :root {
@@ -235,9 +235,8 @@
 <body>
 <div class="app">
   <header>
-    <h1>🎯 CS2  关中Major· 交易市场</h1>
+    <h1>🎯 CS2 校内赛 · 交易市场</h1>
     <div id="authContainer" class="auth-panel">
-      <!-- 登录前显示 -->
       <input type="email" id="loginEmail" placeholder="队长邮箱" />
       <input type="password" id="loginPassword" placeholder="密码" />
       <button class="btn" onclick="signUp()">注册</button>
@@ -249,16 +248,13 @@
     </div>
   </header>
 
-  <!-- 队伍列表容器 -->
   <div id="teamsContainer" class="teams-grid"></div>
 
-  <!-- 待处理交易请求（仅队长可见） -->
   <div id="pendingContainer" class="pending-section hidden">
     <h2 style="margin-bottom:15px;">📬 收到的交易请求</h2>
     <div id="pendingList" class="pending-list"></div>
   </div>
 
-  <!-- 交易发起模态框 -->
   <div id="tradeModal" class="modal hidden">
     <div class="modal-content">
       <div class="modal-header">
@@ -279,31 +275,31 @@
 </div>
 
 <script>
-  // ==================== 配置 Supabase ====================
-  const SUPABASE_URL = 'https://pscuaajkfzcwibzsrlan.supabase.co';   // 替换
-  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBzY3VhYWprZnpjd2lienNybGFuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM2Nzk5MjYsImV4cCI6MjA5OTI1NTkyNn0.qZDwZxRDsYCR279E6gj3BZbjklPY9x3MFHTphPJBX-k';                // 替换
+  // ==================== 初始化 Supabase (只声明一次) ====================
+  const SUPABASE_URL = 'https://你的项目ID.supabase.co';
+  const SUPABASE_ANON_KEY = '你的anon key';
   const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
   // ==================== 全局状态 ====================
   let currentUser = null;
-  let teamsData = [];           // 所有队伍（含队员）
-  let teamPrices = {};         // 队伍当前总价 {id: total}
-  let pendingTradeId = null;   // 模态框中暂存的交易数据
+  let teamsData = [];
+  let teamPrices = {};
   let pendingFromPlayer = null;
   let pendingToPlayer = null;
 
-  // ==================== 认证逻辑 ====================
+  // ==================== 认证函数 ====================
   async function signUp() {
     const email = document.getElementById('loginEmail').value.trim();
     const password = document.getElementById('loginPassword').value;
     if (!email || !password) return alert('请输入邮箱和密码');
     const { error } = await supabase.auth.signUp({ email, password });
-    alert(error ? error.message : '注册成功，请登录（邮箱验证已关闭）');
+    alert(error ? error.message : '注册成功，请登录（无需验证邮箱）');
   }
 
   async function signIn() {
     const email = document.getElementById('loginEmail').value.trim();
     const password = document.getElementById('loginPassword').value;
+    if (!email || !password) return alert('请输入邮箱和密码');
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) return alert(error.message);
     currentUser = data.user;
@@ -330,7 +326,7 @@
     }
   }
 
-  // 检查已登录状态（刷新页面恢复）
+  // 页面加载时检查登录状态
   async function checkSession() {
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
@@ -379,8 +375,6 @@
       const currentPrice = teamPrices[team.id] || 0;
       const players = team.players || [];
       const playerTags = players.map(p => {
-        let extraClass = '';
-        // 高亮当前队长选中的本队队员（用于交易）—— 动态处理在JS中
         return `
           <span class="player-tag" 
                 data-player-id="${p.id}" 
@@ -410,13 +404,11 @@
         </div>`;
     }).join('');
 
-    // 若已登录，标记当前用户所属队伍（用于交易发起方）
     if (currentUser) {
       highlightOwnTeamPlayers();
     }
   }
 
-  // 高亮当前队长自己队伍的球员（视觉提示）
   async function highlightOwnTeamPlayers() {
     if (!currentUser) return;
     const { data: myTeam } = await supabase
@@ -437,16 +429,13 @@
   // ==================== 交易交互 ====================
   function onPlayerClick(playerId, teamId) {
     if (!currentUser) return alert('请先登录队长账号');
-    // 检查当前用户是否队长
     supabase.from('teams').select('id').eq('captain_id', currentUser.id).single()
       .then(({ data: myTeam }) => {
         if (!myTeam) return alert('你不是任何队伍的队长，无法发起交易');
         if (teamId === myTeam.id) {
-          // 点击了自己队伍的球员：设为交易本方球员
           pendingFromPlayer = playerId;
           alert('已选择本方球员：' + playerId + '，现在请点击目标球队的球员');
         } else {
-          // 点击了其他球队球员：需要先选好本方球员
           if (!pendingFromPlayer) {
             return alert('请先点击本队（高亮边框）的一名球员作为交易筹码');
           }
@@ -457,7 +446,6 @@
   }
 
   async function openTradeModal(fromTeamId, toTeamId) {
-    // 获取两名球员信息
     const [{ data: fromP }, { data: toP }] = await Promise.all([
       supabase.from('players').select('*').eq('id', pendingFromPlayer).single(),
       supabase.from('players').select('*').eq('id', pendingToPlayer).single()
@@ -469,11 +457,13 @@
     document.getElementById('modalToPlayer').innerText = `${toP.name} (${toP.price}币)`;
     document.getElementById('modalPriceDiff').innerText = diff;
     const warnEl = document.getElementById('modalWarning');
+    const confirmBtn = document.getElementById('confirmTradeBtn');
+    
+    // 差价检查
     if (diff > 1) {
       warnEl.innerText = '⚠️ 身价差距超过1，不符合规则！';
-      document.getElementById('confirmTradeBtn').disabled = true;
+      confirmBtn.disabled = true;
     } else {
-      // 进一步检查工资帽（模拟交换后）
       const fromCurrent = teamPrices[fromTeamId] || 0;
       const toCurrent = teamPrices[toTeamId] || 0;
       const fromTeam = teamsData.find(t => t.id === fromTeamId);
@@ -482,10 +472,10 @@
       const newToTotal = toCurrent - toP.price + fromP.price;
       if (newFromTotal > fromTeam.budget_cap || newToTotal > toTeam.budget_cap) {
         warnEl.innerText = '⚠️ 交易后工资帽超出！无法发起';
-        document.getElementById('confirmTradeBtn').disabled = true;
+        confirmBtn.disabled = true;
       } else {
         warnEl.innerText = '✅ 符合交易规则';
-        document.getElementById('confirmTradeBtn').disabled = false;
+        confirmBtn.disabled = false;
       }
     }
     document.getElementById('tradeModal').classList.remove('hidden');
@@ -503,7 +493,6 @@
       supabase.from('players').select('*').eq('id', pendingFromPlayer).single(),
       supabase.from('players').select('*').eq('id', pendingToPlayer).single()
     ]);
-    // 插入交易请求
     const { error } = await supabase.from('trades').insert({
       from_team_id: fromP.team_id,
       to_team_id: toP.team_id,
@@ -519,7 +508,7 @@
     } else {
       alert('交易请求已发送！');
       closeTradeModal();
-      loadAllData(); // 刷新列表
+      loadAllData();
     }
   }
 
@@ -531,10 +520,9 @@
       container.classList.add('hidden');
       return;
     }
-    // 获取当前用户的队长队伍
     const { data: myTeam } = await supabase
       .from('teams')
-      .select('id, name')
+      .select('id')
       .eq('captain_id', currentUser.id)
       .single();
     if (!myTeam) {
@@ -569,7 +557,6 @@
   }
 
   async function acceptTrade(tradeId) {
-    // 调用后端函数安全执行交易
     const { error } = await supabase.rpc('execute_trade', { trade_id: tradeId });
     if (error) {
       alert('交易失败：' + error.message);
@@ -588,7 +575,7 @@
     else loadAllData();
   }
 
-  // ==================== 定时刷新（每30秒） ====================
+  // ==================== 定时刷新 ====================
   setInterval(() => {
     if (currentUser) loadAllData();
   }, 30000);
